@@ -65,6 +65,9 @@ export const useAgora = () => {
 
     const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
       await client.subscribe(user, mediaType);
+      if (mediaType === 'audio' && user.audioTrack) {
+        user.audioTrack.play();
+      }
       setRemoteUsers(prev => [...prev.filter(u => u.uid !== user.uid), user]);
     };
 
