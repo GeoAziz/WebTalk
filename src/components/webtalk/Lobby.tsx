@@ -5,11 +5,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { User, VideoOff } from 'lucide-react';
+import { User, Video, VideoOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import type { ICameraVideoTrack } from 'agora-rtc-sdk-ng';
+import { useToast } from '@/hooks/use-toast';
 
 interface LobbyProps {
   onJoinCall: (channelName: string) => void;
@@ -18,11 +19,13 @@ interface LobbyProps {
   onRetryCamera: () => void;
   isInitializing: boolean;
   isVideoMuted: boolean;
+  onToggleVideo: () => void;
 }
 
-export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCamera, isInitializing, isVideoMuted }: LobbyProps) {
+export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCamera, isInitializing, isVideoMuted, onToggleVideo }: LobbyProps) {
   const [channelName, setChannelName] = useState('main');
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (videoRef.current && localStream) {
@@ -69,13 +72,21 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
                     <p>{isInitializing ? 'Initializing devices...' : 'Camera is off or unavailable'}</p>
                 </div>
               )}
+               <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+                <Button onClick={onToggleVideo} size="icon" className="rounded-full">
+                  {isVideoMuted ? <VideoOff /> : <Video />}
+                </Button>
+              </div>
             </div>
             { !hasCameraPermission && !isInitializing && (
               <Alert variant="destructive">
                 <AlertTitle>Camera Access Required</AlertTitle>
                 <AlertDescription className="flex justify-between items-center">
                   <span>Please allow camera access to use this feature.</span>
-                   <Button variant="secondary" size="sm" onClick={onRetryCamera}>
+                   <Button variant="secondary" size="sm" onClick={() => {
+                     onRetryCamera();
+                     toast({title: "Retrying camera access..."});
+                   }}>
                     Retry
                     </Button>
                 </AlertDescription>

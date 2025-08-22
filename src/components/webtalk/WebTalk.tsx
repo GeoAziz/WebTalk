@@ -38,8 +38,12 @@ export default function WebTalk() {
     isScreenSharing,
     hasCameraPermission,
     isInitializing,
-    initializeTracks
+    initializeClient,
   } = useAgora();
+
+  useEffect(() => {
+    initializeClient();
+  }, [initializeClient]);
 
   const handleJoinCall = (channel: string) => {
     setChannelName(channel);
@@ -52,7 +56,7 @@ export default function WebTalk() {
   const handleLeaveCall = async () => {
     await leave();
     setIsInCall(false);
-    await initializeTracks();
+    await initializeClient();
   };
 
   const handleToggleChat = () => setIsChatOpen(prev => !prev);
@@ -85,9 +89,10 @@ export default function WebTalk() {
         onJoinCall={handleJoinCall} 
         localStream={localStream} 
         hasCameraPermission={hasCameraPermission}
-        onRetryCamera={initializeTracks}
+        onRetryCamera={initializeClient}
         isInitializing={isInitializing}
         isVideoMuted={isVideoMuted}
+        onToggleVideo={toggleVideo}
     />;
   }
   
