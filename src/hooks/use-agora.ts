@@ -35,7 +35,7 @@ export const useAgora = () => {
         }
         setHasCameraPermission(true);
         console.log('[Agora] Initialized local tracks');
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to get local stream', error);
         setHasCameraPermission(false);
         toast({
@@ -68,49 +68,26 @@ export const useAgora = () => {
     const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
       console.log(`[Agora] User published: uid=${user.uid}, mediaType=${mediaType}`);
       await client.subscribe(user, mediaType);
-      if (mediaType === 'audio' && user.audioTrack) {
-        user.audioTrack.play();
+      if (mediaType === 'audio') {
+        user.audioTrack?.play();
         console.log(`[Agora] Playing remote audio for uid=${user.uid}`);
       }
-      if (mediaType === 'video' && user.videoTrack) {
-        console.log(`[Agora] Remote video track available for uid=${user.uid}`);
-      }
-      setRemoteUsers(prev => {
-        const updated = [...prev.filter(u => u.uid !== user.uid), user];
-        console.log('[Agora] Updated remoteUsers:', updated.map(u => u.uid));
-        return updated;
-      });
+      setRemoteUsers(prev => [...prev]);
     };
 
     const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
         console.log(`[Agora] User unpublished: uid=${user.uid}`);
-        setRemoteUsers(prevUsers => {
-            const index = prevUsers.findIndex(u => u.uid === user.uid);
-            if (index > -1) {
-                const newUsers = [...prevUsers];
-                newUsers[index] = user;
-                return newUsers;
-            }
-            return prevUsers;
-        });
+        setRemoteUsers(prevUsers => [...prevUsers]);
     };
     
     const handleUserJoined = (user: IAgoraRTCRemoteUser) => {
         console.log(`[Agora] User joined: uid=${user.uid}`);
-        setRemoteUsers(prev => {
-          const updated = [...prev, user];
-          console.log('[Agora] Updated remoteUsers:', updated.map(u => u.uid));
-          return updated;
-        });
+        setRemoteUsers(prev => [...prev, user]);
     };
 
     const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
       console.log(`[Agora] User left: uid=${user.uid}`);
-      setRemoteUsers(prev => {
-        const updated = prev.filter(u => u.uid !== user.uid);
-        console.log('[Agora] Updated remoteUsers:', updated.map(u => u.uid));
-        return updated;
-      });
+      setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
     };
 
     client.on('user-published', handleUserPublished);
@@ -132,10 +109,11 @@ export const useAgora = () => {
     try {
       const joinedUid = await client.join(appId, channel, null);
       setUid(String(joinedUid));
-      // Always publish local tracks after joining
-      if (localAudioTrackRef.current && localVideoTrackRef.current) {
-        await client.publish([localAudioTrackRef.current, localVideoTrackRef.current]);
-        console.log('[Agora] Published local audio and video tracks');
+
+      const tracksToPublish = [localAudioTrackRef.current, localVideoTrackRef.current].filter(t => t) as (IMicrophoneAudioTrack | ICameraVideoTrack)[];
+      if (tracksToPublish.length > 0) {
+        await client.publish(tracksToPublish);
+        console.log('[Agora] Published local tracks');
       } else {
         console.warn('[Agora] Local tracks not available for publishing');
       }
@@ -168,7 +146,6 @@ export const useAgora = () => {
     }
     
     if (client && client.localTracks.length > 0) {
-        // Ensure all tracks are stopped and closed before unpublishing
         client.localTracks.forEach(track => {
             track.stop();
             track.close();
@@ -185,7 +162,6 @@ export const useAgora = () => {
     setIsScreenSharing(false);
     setIsAudioMuted(false);
     setIsVideoMuted(false);
-    // Do not set local stream to null here
   
   }, [isScreenSharing, stopScreenShare]);
 
@@ -223,7 +199,6 @@ export const useAgora = () => {
             stopScreenShare();
         });
 
-        setLocalStream(null); // Stop rendering local camera in the grid
         setIsScreenSharing(true);
 
     } catch (err: any) {
@@ -232,7 +207,7 @@ export const useAgora = () => {
         toast({
           variant: 'destructive',
           title: 'Screen Share Failed',
-          description: 'Permission was denied. This can happen if the app is in an iframe.',
+          description: 'Permission was denied. Please check your browser settings.',
         });
       } else {
         toast({
