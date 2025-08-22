@@ -132,10 +132,12 @@ export const useAgora = () => {
     try {
       const joinedUid = await client.join(appId, channel, null);
       setUid(String(joinedUid));
+      // Always publish local tracks after joining
       if (localAudioTrackRef.current && localVideoTrackRef.current) {
-        if (client.connectionState !== 'CONNECTED') {
-          await client.publish([localAudioTrackRef.current, localVideoTrackRef.current]);
-        }
+        await client.publish([localAudioTrackRef.current, localVideoTrackRef.current]);
+        console.log('[Agora] Published local audio and video tracks');
+      } else {
+        console.warn('[Agora] Local tracks not available for publishing');
       }
     } catch (err: any) {
       console.error('Join failed', err);
