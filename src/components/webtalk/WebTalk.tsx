@@ -41,27 +41,18 @@ export default function WebTalk() {
     initializeTracks
   } = useAgora();
 
-  useEffect(() => {
-    if (isInCall && user) {
-        join(channelName, user.displayName || 'Anonymous');
-    }
-
-    return () => {
-        if(isInCall) {
-            leave();
-        }
-    }
-  }, [isInCall, channelName, user, join, leave]);
-
-
   const handleJoinCall = (channel: string) => {
     setChannelName(channel);
     setIsInCall(true);
+    if (user) {
+        join(channel, user.displayName || 'Anonymous');
+    }
   }
 
-  const handleLeaveCall = () => {
-    leave();
+  const handleLeaveCall = async () => {
+    await leave();
     setIsInCall(false);
+    await initializeTracks();
   };
 
   const handleToggleChat = () => setIsChatOpen(prev => !prev);
@@ -96,6 +87,7 @@ export default function WebTalk() {
         hasCameraPermission={hasCameraPermission}
         onRetryCamera={initializeTracks}
         isInitializing={isInitializing}
+        isVideoMuted={isVideoMuted}
     />;
   }
   

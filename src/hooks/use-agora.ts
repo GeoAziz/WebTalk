@@ -16,22 +16,17 @@ export const useAgora = () => {
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
   const [uid, setUid] = useState<string | null>(null);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState(true);
-  const [isInitializing, setIsInitializing] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const { toast } = useToast();
-
+  
   const initializeTracks = useCallback(async () => {
-    if (isInitializing) {
-        console.log('[Agora] Initialization already in progress.');
-        return;
-    }
     console.log('[Agora] Starting track initialization...');
     setIsInitializing(true);
 
-    // Initialize Audio
     try {
       if (!localAudioTrackRef.current) {
           const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
@@ -47,36 +42,38 @@ export const useAgora = () => {
         });
     }
 
-    // Initialize Video
+    // Try to get video, but don't block if it fails.
     try {
         if (!localVideoTrackRef.current) {
             const videoTrack = await AgoraRTC.createCameraVideoTrack();
             localVideoTrackRef.current = videoTrack;
             setLocalStream(videoTrack);
+            setHasCameraPermission(true);
+            setIsVideoMuted(false);
             console.log('[Agora] Camera track created.');
         }
-        setHasCameraPermission(true);
     } catch (error: any) {
         console.error('Failed to get camera stream', error);
+        setHasCameraPermission(false);
+        setIsVideoMuted(true);
         if (error.code === 'NOT_READABLE' || error.name === 'NotReadableError') {
              toast({
                 variant: 'destructive',
                 title: 'Camera Error',
                 description: 'Your camera is already in use by another application or is unavailable.',
             });
-        } else {
+        } else if (error.code !== 'PERMISSION_DENIED' && error.name !== 'NotAllowedError') {
             toast({
                 variant: 'destructive',
                 title: 'Device Error',
                 description: 'Could not access camera. Please check permissions.',
             });
         }
-        setHasCameraPermission(false);
     } finally {
         setIsInitializing(false);
         console.log('[Agora] Track initialization finished.');
     }
-  }, [toast, isInitializing]);
+  }, [toast]);
   
   useEffect(() => {
     const client = clientRef.current;
@@ -85,21 +82,23 @@ export const useAgora = () => {
     const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
       console.log(`[Agora] User published: uid=${user.uid}, mediaType=${mediaType}`);
       await client.subscribe(user, mediaType);
-      if (mediaType === 'audio' && user.audioTrack) {
-        user.audioTrack.play();
+      
+      if (mediaType === 'audio') {
+        user.audioTrack?.play();
         console.log(`[Agora] Playing remote audio for uid=${user.uid}`);
       }
+      
       setRemoteUsers(prev => [...prev]);
     };
 
     const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
         console.log(`[Agora] User unpublished: uid=${user.uid}`);
-        setRemoteUsers(prevUsers => [...prevUsers]);
+        setRemoteUsers(prevUsers => prevUsers.map(u => u.uid === user.uid ? user : u));
     };
     
     const handleUserJoined = (user: IAgoraRTCRemoteUser) => {
         console.log(`[Agora] User joined: uid=${user.uid}`);
-        setRemoteUsers(prev => [...prev, user]);
+        setRemoteUsers(prev => [...prev.filter(u => u.uid !== user.uid), user]);
     };
 
     const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
@@ -124,10 +123,11 @@ export const useAgora = () => {
     const client = clientRef.current;
     if (!client) return;
     try {
-      const joinedUid = await client.join(appId, channel, null);
+      const joinedUid = await client.join(appId, channel, null, displayName);
       setUid(String(joinedUid));
 
       const tracksToPublish = [localAudioTrackRef.current, localVideoTrackRef.current].filter(Boolean) as (IMicrophoneAudioTrack | ICameraVideoTrack)[];
+
       if (tracksToPublish.length > 0) {
         await client.publish(tracksToPublish);
         console.log('[Agora] Published local tracks');
@@ -142,15 +142,17 @@ export const useAgora = () => {
 
   const stopScreenShare = useCallback(async () => {
     const client = clientRef.current;
-    if (!screenTrackRef.current || !localVideoTrackRef.current || !client) return;
+    if (!screenTrackRef.current || !client) return;
   
     await client.unpublish(screenTrackRef.current);
     screenTrackRef.current.stop();
     screenTrackRef.current.close();
     screenTrackRef.current = null;
     
-    await client.publish(localVideoTrackRef.current);
-    setLocalStream(localVideoTrackRef.current);
+    if (localVideoTrackRef.current) {
+        await client.publish(localVideoTrackRef.current);
+        setLocalStream(localVideoTrackRef.current);
+    }
     setIsScreenSharing(false);
   
   }, []);
@@ -178,38 +180,74 @@ export const useAgora = () => {
     setUid(null);
     setIsScreenSharing(false);
     setIsAudioMuted(false);
-    setIsVideoMuted(false);
+    setIsVideoMuted(true);
+    localAudioTrackRef.current = null;
+    localVideoTrackRef.current = null;
+    setLocalStream(null);
   
   }, [isScreenSharing, stopScreenShare]);
 
 
   const toggleAudio = useCallback(async () => {
     if (localAudioTrackRef.current) {
-      await localAudioTrackRef.current.setMuted(!isAudioMuted);
-      setIsAudioMuted(!isAudioMuted);
+      const nextMutedState = !isAudioMuted;
+      await localAudioTrackRef.current.setMuted(nextMutedState);
+      setIsAudioMuted(nextMutedState);
     }
   }, [isAudioMuted]);
 
   const toggleVideo = useCallback(async () => {
+    if(isScreenSharing) return;
+
     if (localVideoTrackRef.current) {
-      await localVideoTrackRef.current.setMuted(!isVideoMuted);
-      setIsVideoMuted(!isVideoMuted);
+      const nextMutedState = !isVideoMuted;
+      await localVideoTrackRef.current.setMuted(nextMutedState);
+      setIsVideoMuted(nextMutedState);
+    } else if (hasCameraPermission) {
+      // If video doesn't exist but we have permission, try creating it now
+      try {
+        const videoTrack = await AgoraRTC.createCameraVideoTrack();
+        localVideoTrackRef.current = videoTrack;
+        setLocalStream(videoTrack);
+        
+        if (clientRef.current?.connectionState === 'CONNECTED') {
+          await clientRef.current.publish(videoTrack);
+        }
+        
+        setIsVideoMuted(false);
+      } catch (error) {
+        console.error("Failed to create video track on demand", error);
+        toast({
+          variant: "destructive",
+          title: "Camera Error",
+          description: "Could not start your camera.",
+        });
+      }
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Camera Permission Denied",
+            description: "Please grant camera permission in your browser settings.",
+        });
     }
-  }, [isVideoMuted]);
+  }, [isVideoMuted, isScreenSharing, hasCameraPermission, toast]);
 
 
   const startScreenShare = useCallback(async () => {
     const client = clientRef.current;
-    if (!localVideoTrackRef.current || !client) return;
+    if (!client) return;
 
     try {
         const screenTrackResult = await AgoraRTC.createScreenVideoTrack({}, "auto");
         const screenTrack = Array.isArray(screenTrackResult) ? screenTrackResult[0] : screenTrackResult;
         
-        await client.unpublish(localVideoTrackRef.current);
+        if (localVideoTrackRef.current) {
+            await client.unpublish(localVideoTrackRef.current);
+        }
         
         screenTrackRef.current = screenTrack;
         await client.publish(screenTrack);
+        setLocalStream(screenTrack); // show screen share locally
 
         // Listen for the user stopping screen share from the browser UI
         screenTrack.on("track-ended", () => {
@@ -217,6 +255,7 @@ export const useAgora = () => {
         });
 
         setIsScreenSharing(true);
+        setIsVideoMuted(false);
 
     } catch (err: any) {
       console.error("Screen share failed", err);
@@ -238,16 +277,21 @@ export const useAgora = () => {
   
   useEffect(() => {
     const initializeClient = async () => {
-      clientRef.current = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-      console.log('[Agora] Client created');
+      if (!clientRef.current) {
+        clientRef.current = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        console.log('[Agora] Client created');
+      }
       await initializeTracks();
     };
     initializeClient();
 
     return () => {
-      localAudioTrackRef.current?.close();
-      localVideoTrackRef.current?.close();
-      clientRef.current?.leave();
+        if(clientRef.current) {
+            clientRef.current.leave();
+        }
+        localAudioTrackRef.current?.close();
+        localVideoTrackRef.current?.close();
+        screenTrackRef.current?.close();
     };
   }, [initializeTracks]);
 
@@ -258,7 +302,7 @@ export const useAgora = () => {
     localStream, 
     remoteUsers,
     isAudioMuted,
-    isVideoMuted,
+    isVideoMuted: isVideoMuted || !hasCameraPermission,
     isScreenSharing,
     hasCameraPermission,
     isInitializing,

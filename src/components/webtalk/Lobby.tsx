@@ -17,15 +17,20 @@ interface LobbyProps {
   hasCameraPermission: boolean;
   onRetryCamera: () => void;
   isInitializing: boolean;
+  isVideoMuted: boolean;
 }
 
-export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCamera, isInitializing }: LobbyProps) {
+export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCamera, isInitializing, isVideoMuted }: LobbyProps) {
   const [channelName, setChannelName] = useState('main');
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current && localStream && hasCameraPermission) {
-      localStream.play(videoRef.current);
+    if (videoRef.current && localStream) {
+      if (!isVideoMuted) {
+        localStream.play(videoRef.current);
+      } else {
+        localStream.stop();
+      }
     }
      
      return () => {
@@ -33,7 +38,7 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
             localStream.stop();
         }
      }
-  }, [localStream, hasCameraPermission]);
+  }, [localStream, isVideoMuted]);
 
 
   const handleJoin = () => {
@@ -41,6 +46,8 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
       onJoinCall(channelName.trim());
     }
   };
+  
+  const showVideo = localStream && !isVideoMuted;
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -51,7 +58,7 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
         <CardContent>
           <div className="space-y-4">
             <div className="relative aspect-video bg-muted rounded-lg overflow-hidden flex items-center justify-center">
-              {localStream && hasCameraPermission ? (
+              {showVideo ? (
                 <div
                     ref={videoRef}
                     className="w-full h-full object-cover"
@@ -63,13 +70,13 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
                 </div>
               )}
             </div>
-            { !hasCameraPermission && (
+            { !hasCameraPermission && !isInitializing && (
               <Alert variant="destructive">
                 <AlertTitle>Camera Access Required</AlertTitle>
                 <AlertDescription className="flex justify-between items-center">
                   <span>Please allow camera access to use this feature.</span>
-                   <Button variant="secondary" size="sm" onClick={onRetryCamera} disabled={isInitializing}>
-                    {isInitializing ? 'Retrying...' : 'Retry'}
+                   <Button variant="secondary" size="sm" onClick={onRetryCamera}>
+                    Retry
                     </Button>
                 </AlertDescription>
               </Alert>
@@ -83,8 +90,8 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
                 onChange={(e) => setChannelName(e.target.value)}
               />
             </div>
-            <Button onClick={handleJoin} className="w-full" disabled={!channelName.trim() || !hasCameraPermission}>
-              Join Call
+            <Button onClick={handleJoin} className="w-full" disabled={!channelName.trim() || isInitializing}>
+              {isInitializing ? 'Joining...' : 'Join Call'}
             </Button>
           </div>
         </CardContent>
