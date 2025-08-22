@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, IScreenVideoTrack } from 'agora-rtc-sdk-ng';
 import { useToast } from './use-toast';
 
-const appId = 'f5b2cc3091c04b67bc92482ad0b0c5ea';
+const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 
 export const useAgora = () => {
   const clientRef = useRef<IAgoraRTCClient>();
