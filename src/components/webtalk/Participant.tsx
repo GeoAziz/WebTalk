@@ -25,19 +25,26 @@ export function Participant({ name, isMuted, isLocal, isVideoOff, isNoiseCancell
   useEffect(() => {
     if (videoRef.current) {
         if (isLocal && localStream) {
+            console.log(`[Participant] Playing local video for uid=${uid}`);
             localStream.play(videoRef.current);
         } else if (user?.videoTrack) {
+            console.log(`[Participant] Playing remote video for uid=${uid}`);
             user.videoTrack.play(videoRef.current);
         }
     }
     
     return () => {
         if(isLocal && localStream) {
+            console.log(`[Participant] Stopping local video for uid=${uid}`);
             localStream.stop();
         }
         // Remote track is stopped by Agora automatically on user leave
     }
   }, [user, isLocal, localStream]);
+
+  useEffect(() => {
+    console.log(`[Participant] Render: name=${name}, uid=${uid}, isLocal=${isLocal}, isMuted=${isMuted}, isVideoOff=${isVideoOff}`);
+  }, [name, uid, isLocal, isMuted, isVideoOff]);
 
   return (
     <Card className="relative aspect-video flex items-center justify-center overflow-hidden bg-card/50 shadow-lg">

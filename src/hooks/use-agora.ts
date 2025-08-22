@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useEffect, useCallback, useRef } from 'react';
-import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, IScreenVideoTrack } from 'agora-rtc-sdk-ng';
+import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser, ICameraVideoTrack, IMicrophoneAudioTrack, ILocalVideoTrack } from 'agora-rtc-sdk-ng';
 import { useToast } from './use-toast';
 
 const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
@@ -11,7 +11,7 @@ export const useAgora = () => {
   const [localStream, setLocalStream] = useState<ICameraVideoTrack | null>(null);
   const localAudioTrackRef = useRef<IMicrophoneAudioTrack | null>(null);
   const localVideoTrackRef = useRef<ICameraVideoTrack | null>(null);
-  const screenTrackRef = useRef<IScreenVideoTrack | null>(null);
+  const screenTrackRef = useRef<ILocalVideoTrack | null>(null);
 
   const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
   const [uid, setUid] = useState<string | null>(null);
@@ -34,6 +34,7 @@ export const useAgora = () => {
             setLocalStream(videoTrack);
         }
         setHasCameraPermission(true);
+        console.log('[Agora] Initialized local tracks');
     } catch (error) {
         console.error('Failed to get local stream', error);
         setHasCameraPermission(false);
@@ -46,11 +47,12 @@ export const useAgora = () => {
   }, [toast]);
 
   useEffect(() => {
-    const initializeClient = async () => {
-        clientRef.current = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-        await initializeTracks();
-    };
-    initializeClient();
+  const initializeClient = async () => {
+    clientRef.current = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+    console.log('[Agora] Client created');
+    await initializeTracks();
+  };
+  initializeClient();
 
     return () => {
       localAudioTrackRef.current?.close();
@@ -64,14 +66,24 @@ export const useAgora = () => {
     if (!client) return;
 
     const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
+      console.log(`[Agora] User published: uid=${user.uid}, mediaType=${mediaType}`);
       await client.subscribe(user, mediaType);
       if (mediaType === 'audio' && user.audioTrack) {
         user.audioTrack.play();
+        console.log(`[Agora] Playing remote audio for uid=${user.uid}`);
       }
-      setRemoteUsers(prev => [...prev.filter(u => u.uid !== user.uid), user]);
+      if (mediaType === 'video' && user.videoTrack) {
+        console.log(`[Agora] Remote video track available for uid=${user.uid}`);
+      }
+      setRemoteUsers(prev => {
+        const updated = [...prev.filter(u => u.uid !== user.uid), user];
+        console.log('[Agora] Updated remoteUsers:', updated.map(u => u.uid));
+        return updated;
+      });
     };
 
     const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
+        console.log(`[Agora] User unpublished: uid=${user.uid}`);
         setRemoteUsers(prevUsers => {
             const index = prevUsers.findIndex(u => u.uid === user.uid);
             if (index > -1) {
@@ -84,11 +96,21 @@ export const useAgora = () => {
     };
     
     const handleUserJoined = (user: IAgoraRTCRemoteUser) => {
-        setRemoteUsers(prev => [...prev, user]);
+        console.log(`[Agora] User joined: uid=${user.uid}`);
+        setRemoteUsers(prev => {
+          const updated = [...prev, user];
+          console.log('[Agora] Updated remoteUsers:', updated.map(u => u.uid));
+          return updated;
+        });
     };
 
     const handleUserLeft = (user: IAgoraRTCRemoteUser) => {
-      setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+      console.log(`[Agora] User left: uid=${user.uid}`);
+      setRemoteUsers(prev => {
+        const updated = prev.filter(u => u.uid !== user.uid);
+        console.log('[Agora] Updated remoteUsers:', updated.map(u => u.uid));
+        return updated;
+      });
     };
 
     client.on('user-published', handleUserPublished);
@@ -186,7 +208,8 @@ export const useAgora = () => {
     if (!localVideoTrackRef.current || !client) return;
 
     try {
-        const screenTrack = await AgoraRTC.createScreenVideoTrack({}, "auto");
+        const screenTrackResult = await AgoraRTC.createScreenVideoTrack({}, "auto");
+        const screenTrack = Array.isArray(screenTrackResult) ? screenTrackResult[0] : screenTrackResult;
         
         await client.unpublish(localVideoTrackRef.current);
         
