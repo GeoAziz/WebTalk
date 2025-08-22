@@ -16,14 +16,15 @@ interface LobbyProps {
   localStream: ICameraVideoTrack | null;
   hasCameraPermission: boolean;
   onRetryCamera: () => void;
+  isInitializing: boolean;
 }
 
-export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCamera }: LobbyProps) {
+export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCamera, isInitializing }: LobbyProps) {
   const [channelName, setChannelName] = useState('main');
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current && localStream) {
+    if (videoRef.current && localStream && hasCameraPermission) {
       localStream.play(videoRef.current);
     }
      
@@ -32,7 +33,7 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
             localStream.stop();
         }
      }
-  }, [localStream]);
+  }, [localStream, hasCameraPermission]);
 
 
   const handleJoin = () => {
@@ -58,7 +59,7 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
               ) : (
                 <div className="flex flex-col items-center gap-4 text-muted-foreground">
                     <VideoOff className="w-16 h-16" />
-                    <p>Camera is off or unavailable</p>
+                    <p>{isInitializing ? 'Initializing devices...' : 'Camera is off or unavailable'}</p>
                 </div>
               )}
             </div>
@@ -67,7 +68,9 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
                 <AlertTitle>Camera Access Required</AlertTitle>
                 <AlertDescription className="flex justify-between items-center">
                   <span>Please allow camera access to use this feature.</span>
-                  <Button variant="secondary" size="sm" onClick={onRetryCamera}>Retry</Button>
+                   <Button variant="secondary" size="sm" onClick={onRetryCamera} disabled={isInitializing}>
+                    {isInitializing ? 'Retrying...' : 'Retry'}
+                    </Button>
                 </AlertDescription>
               </Alert>
             )}
@@ -80,7 +83,7 @@ export function Lobby({ onJoinCall, localStream, hasCameraPermission, onRetryCam
                 onChange={(e) => setChannelName(e.target.value)}
               />
             </div>
-            <Button onClick={handleJoin} className="w-full" disabled={!channelName.trim()}>
+            <Button onClick={handleJoin} className="w-full" disabled={!channelName.trim() || !hasCameraPermission}>
               Join Call
             </Button>
           </div>

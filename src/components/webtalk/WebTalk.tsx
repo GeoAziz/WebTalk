@@ -37,6 +37,7 @@ export default function WebTalk() {
     stopScreenShare,
     isScreenSharing,
     hasCameraPermission,
+    isInitializing,
     initializeTracks
   } = useAgora();
 
@@ -94,6 +95,7 @@ export default function WebTalk() {
         localStream={localStream} 
         hasCameraPermission={hasCameraPermission}
         onRetryCamera={initializeTracks}
+        isInitializing={isInitializing}
     />;
   }
   

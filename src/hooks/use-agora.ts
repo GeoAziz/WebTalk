@@ -19,32 +19,53 @@ export const useAgora = () => {
   const [isVideoMuted, setIsVideoMuted] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   const { toast } = useToast();
 
   const initializeTracks = useCallback(async () => {
+    if (isInitializing) {
+        console.log('[Agora] Initialization already in progress.');
+        return;
+    }
+    console.log('[Agora] Starting track initialization...');
+    setIsInitializing(true);
+    
     try {
         if (!localAudioTrackRef.current) {
             const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
             localAudioTrackRef.current = audioTrack;
+            console.log('[Agora] Microphone track created.');
         }
         if (!localVideoTrackRef.current) {
             const videoTrack = await AgoraRTC.createCameraVideoTrack();
             localVideoTrackRef.current = videoTrack;
             setLocalStream(videoTrack);
+            console.log('[Agora] Camera track created.');
         }
         setHasCameraPermission(true);
-        console.log('[Agora] Initialized local tracks');
+        console.log('[Agora] Successfully initialized local tracks');
     } catch (error: any) {
         console.error('Failed to get local stream', error);
+        if (error.code === 'NOT_READABLE' || error.name === 'NotReadableError') {
+             toast({
+                variant: 'destructive',
+                title: 'Camera Error',
+                description: 'Your camera is already in use by another application or is unavailable.',
+            });
+        } else {
+            toast({
+                variant: 'destructive',
+                title: 'Device Error',
+                description: 'Could not access camera or microphone. Please check permissions.',
+            });
+        }
         setHasCameraPermission(false);
-        toast({
-            variant: 'destructive',
-            title: 'Device Error',
-            description: 'Could not access camera or microphone. Please check permissions.',
-        });
+    } finally {
+        setIsInitializing(false);
+        console.log('[Agora] Track initialization finished.');
     }
-  }, [toast]);
+  }, [toast, isInitializing]);
 
   useEffect(() => {
   const initializeClient = async () => {
@@ -68,8 +89,8 @@ export const useAgora = () => {
     const handleUserPublished = async (user: IAgoraRTCRemoteUser, mediaType: 'audio' | 'video') => {
       console.log(`[Agora] User published: uid=${user.uid}, mediaType=${mediaType}`);
       await client.subscribe(user, mediaType);
-      if (mediaType === 'audio') {
-        user.audioTrack?.play();
+      if (mediaType === 'audio' && user.audioTrack) {
+        user.audioTrack.play();
         console.log(`[Agora] Playing remote audio for uid=${user.uid}`);
       }
       setRemoteUsers(prev => [...prev]);
@@ -228,6 +249,7 @@ export const useAgora = () => {
     isVideoMuted,
     isScreenSharing,
     hasCameraPermission,
+    isInitializing,
     toggleAudio,
     toggleVideo,
     startScreenShare,
