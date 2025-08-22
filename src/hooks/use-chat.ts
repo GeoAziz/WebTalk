@@ -14,10 +14,14 @@ export function useChat(channelName: string, author: string) {
     const chatRef = ref(db, `chats/${channelName}`);
     
     const listener = onChildAdded(chatRef, (snapshot) => {
-      setMessages((prevMessages) => [
-          ...prevMessages,
-          { id: snapshot.key!, ...snapshot.val() }
-      ]);
+      const newMessage = { id: snapshot.key!, ...snapshot.val() };
+      setMessages((prevMessages) => {
+        // Prevent adding duplicate messages
+        if (prevMessages.some(msg => msg.id === newMessage.id)) {
+          return prevMessages;
+        }
+        return [...prevMessages, newMessage];
+      });
     });
 
     return () => {
