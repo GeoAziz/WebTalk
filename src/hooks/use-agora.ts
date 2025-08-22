@@ -69,7 +69,15 @@ export const useAgora = () => {
     };
 
     const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
-        // This is handled by user-left
+        setRemoteUsers(prevUsers => {
+            const index = prevUsers.findIndex(u => u.uid === user.uid);
+            if (index > -1) {
+                const newUsers = [...prevUsers];
+                newUsers[index] = user;
+                return newUsers;
+            }
+            return prevUsers;
+        });
     };
     
     const handleUserJoined = (user: IAgoraRTCRemoteUser) => {
