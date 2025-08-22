@@ -169,49 +169,58 @@ export const useAgora = () => {
   }, [isAudioMuted]);
 
   const toggleVideo = useCallback(async () => {
-    if(isScreenSharing) return;
+    const client = clientRef.current;
+    if (isScreenSharing || !client) return;
 
     if (localVideoTrackRef.current) {
-      const nextMutedState = !isVideoMuted;
-      await localVideoTrackRef.current.setMuted(nextMutedState);
-      setIsVideoMuted(nextMutedState);
+        const nextMutedState = !isVideoMuted;
+        await localVideoTrackRef.current.setMuted(nextMutedState);
+        setIsVideoMuted(nextMutedState);
+
+        if (client.connectionState === 'CONNECTED') {
+            if (nextMutedState) {
+                await client.unpublish(localVideoTrackRef.current);
+            } else {
+                await client.publish(localVideoTrackRef.current);
+            }
+        }
     } else {
-      try {
-        const videoTrack = await AgoraRTC.createCameraVideoTrack();
-        localVideoTrackRef.current = videoTrack;
-        setLocalStream(videoTrack);
-        setHasCameraPermission(true);
-        
-        if (clientRef.current?.connectionState === 'CONNECTED') {
-          await clientRef.current.publish(videoTrack);
+        try {
+            const videoTrack = await AgoraRTC.createCameraVideoTrack();
+            localVideoTrackRef.current = videoTrack;
+            setLocalStream(videoTrack);
+            setHasCameraPermission(true);
+
+            if (client.connectionState === 'CONNECTED') {
+                await client.publish(videoTrack);
+            }
+            
+            setIsVideoMuted(false);
+        } catch (error: any) {
+            console.error("Failed to create video track on demand", error);
+            setHasCameraPermission(false);
+            if (error.code === 'NOT_READABLE' || error.name === 'NotReadableError') {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Camera Error',
+                    description: 'Your camera is already in use by another application or is unavailable.',
+                });
+            } else if (error.code === 'PERMISSION_DENIED' || error.name === 'NotAllowedError') {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Camera Permission Denied',
+                    description: 'Please grant camera permission in your browser settings.',
+                });
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Device Error',
+                    description: 'Could not access camera. Please check permissions.',
+                });
+            }
         }
-        
-        setIsVideoMuted(false);
-      } catch (error: any) {
-        console.error("Failed to create video track on demand", error);
-        setHasCameraPermission(false);
-        if (error.code === 'NOT_READABLE' || error.name === 'NotReadableError') {
-             toast({
-                variant: 'destructive',
-                title: 'Camera Error',
-                description: 'Your camera is already in use by another application or is unavailable.',
-            });
-        } else if (error.code === 'PERMISSION_DENIED' || error.name === 'NotAllowedError') {
-             toast({
-                variant: 'destructive',
-                title: 'Camera Permission Denied',
-                description: 'Please grant camera permission in your browser settings.',
-            });
-        } else {
-            toast({
-                variant: 'destructive',
-                title: 'Device Error',
-                description: 'Could not access camera. Please check permissions.',
-            });
-        }
-      }
     }
-  }, [isVideoMuted, isScreenSharing, toast]);
+}, [isVideoMuted, isScreenSharing, toast]);
 
 
   const startScreenShare = useCallback(async () => {
