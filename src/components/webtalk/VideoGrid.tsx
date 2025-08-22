@@ -44,8 +44,8 @@ export function VideoGrid({ localStream, isLocalVideoOff, isMuted, isNoiseCancel
             user={p}
             uid={p.uid}
             name={`User ${p.uid}`}
-            isVideoOff={!p.hasVideo}
-            isMuted={!p.hasAudio}
+            isVideoOff={!p.videoTrack}
+            isMuted={!p.audioTrack}
           />
         ))}
       </div>
