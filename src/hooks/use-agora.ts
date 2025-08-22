@@ -161,9 +161,6 @@ export const useAgora = () => {
     setIsScreenSharing(false);
     setIsAudioMuted(false);
     setIsVideoMuted(false);
-
-    localAudioTrackRef.current = null;
-    localVideoTrackRef.current = null;
     setLocalStream(null);
   
   }, [isScreenSharing, stopScreenShare]);
