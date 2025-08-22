@@ -23,24 +23,35 @@ export function Participant({ name, isMuted, isLocal, isVideoOff, isNoiseCancell
   const videoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (videoRef.current) {
-        if (isLocal && localStream) {
-            console.log(`[Participant] Playing local video for uid=${uid}`);
+    if (isLocal && localStream && videoRef.current) {
+        if (!isVideoOff) {
             localStream.play(videoRef.current);
-        } else if (user?.videoTrack) {
-            console.log(`[Participant] Playing remote video for uid=${uid}`);
-            user.videoTrack.play(videoRef.current);
-        }
-    }
-    
-    return () => {
-        if(isLocal && localStream) {
-            console.log(`[Participant] Stopping local video for uid=${uid}`);
+        } else {
             localStream.stop();
         }
-        // Remote track is stopped by Agora automatically on user leave
     }
-  }, [user, isLocal, localStream]);
+    return () => {
+        if (isLocal && localStream) {
+            localStream.stop();
+        }
+    };
+  }, [isLocal, localStream, isVideoOff]);
+  
+  useEffect(() => {
+      if (!isLocal && user?.videoTrack && videoRef.current) {
+          if (!isVideoOff) {
+            user.videoTrack.play(videoRef.current);
+          } else {
+            user.videoTrack.stop();
+          }
+      }
+      return () => {
+          if (!isLocal && user?.videoTrack) {
+              user.videoTrack.stop();
+          }
+      };
+  }, [isLocal, user, isVideoOff]);
+
 
   useEffect(() => {
     console.log(`[Participant] Render: name=${name}, uid=${uid}, isLocal=${isLocal}, isMuted=${isMuted}, isVideoOff=${isVideoOff}`);
