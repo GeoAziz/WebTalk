@@ -61,8 +61,11 @@ export const useAgora = () => {
         user.audioTrack?.play();
         console.log(`[Agora] Playing remote audio for uid=${user.uid}`);
       }
-      
-      setRemoteUsers(prev => [...prev]);
+      if (mediaType === 'video') {
+        console.log(`[Agora] Remote video track ready for uid=${user.uid}`);
+      }
+      // Update remoteUsers state to trigger UI re-render with latest track
+      setRemoteUsers(Array.from(client.remoteUsers));
     };
 
     const handleUserUnpublished = (user: IAgoraRTCRemoteUser) => {
