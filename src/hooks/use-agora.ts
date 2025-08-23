@@ -57,8 +57,8 @@ export const useAgora = () => {
       console.log(`[Agora] User published: uid=${user.uid}, mediaType=${mediaType}`);
       await client.subscribe(user, mediaType);
       
-      if (mediaType === 'audio') {
-        user.audioTrack?.play();
+      if (mediaType === 'audio' && user.audioTrack) {
+        user.audioTrack.play();
         console.log(`[Agora] Playing remote audio for uid=${user.uid}`);
       }
       if (mediaType === 'video') {
@@ -158,7 +158,6 @@ export const useAgora = () => {
     setIsVideoMuted(true);
     localAudioTrackRef.current = null;
     localVideoTrackRef.current = null;
-    setLocalStream(null);
   
   }, [isScreenSharing, stopScreenShare]);
 
@@ -237,7 +236,7 @@ export const useAgora = () => {
         if (localVideoTrackRef.current) {
             await client.unpublish(localVideoTrackRef.current);
             localVideoTrackRef.current.stop();
-            localVideoTrackRef.current = null;
+            setLocalStream(null);
         }
         
         screenTrackRef.current = screenTrack;
