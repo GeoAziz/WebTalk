@@ -100,7 +100,8 @@ export const useAgora = () => {
     const client = clientRef.current;
     if (!client) return;
     try {
-      const joinedUid = await client.join(appId, channel, null, displayName);
+    const tempToken = "007eJxTYFjec3zNludbIhSbiy6/EHO12ZL5Kn/a+x5p4YP7F2jvNHmgwJBmmmSUnGxsYGmYbGCSZGaelGxpZGJhlJhikGSQbJqa+LFiZUZDICND5O9YFkYGCATxWRhyEzPzGBgAFGMiTg==";
+    const joinedUid = await client.join(appId, channel, tempToken, displayName);
       setUid(String(joinedUid));
 
       if (localAudioTrackRef.current) {
